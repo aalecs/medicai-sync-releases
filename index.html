@@ -316,12 +316,15 @@
       const other = document.getElementById('other');
 
       if (detectedArch) {
-        // Confident detection (Chrome/Edge/Brave). Single big CTA, with a
-        // visible "wrong chip?" escape hatch underneath.
+        // Confident detection (Chrome/Edge/Brave). Single big CTA — but the
+        // label spells out the detected chip so the user can immediately
+        // tell whether it matches their machine. Wrong-chip escape hatch
+        // sits underneath.
         const asset = detectedArch === 'arm' ? ASSETS.mac_arm : ASSETS.mac_x64;
+        const archLabel = detectedArch === 'arm' ? 'Apple chip' : 'Intel chip';
         const otherAsset = detectedArch === 'arm' ? ASSETS.mac_x64 : ASSETS.mac_arm;
         const otherLabel = detectedArch === 'arm' ? 'Intel' : 'Apple';
-        cta.innerHTML = btnHTML(asset, 'apple');
+        cta.innerHTML = btnHTML(asset, 'apple', `macOS · ${archLabel}`);
         hint.innerHTML = `
           On a different Mac? Get the
           <a href="${otherAsset.url}" class="switch-link" download>
