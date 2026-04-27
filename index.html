@@ -109,34 +109,27 @@
     .primary-btn:focus-visible { outline: 3px solid var(--color-primary-soft); outline-offset: 2px; }
     .primary-btn svg { width: 18px; height: 18px; }
 
-    .arch-toggle {
+    /* Two equal-weight buttons for undetected Mac (Safari/Firefox) */
+    .dual-cta {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .dual-cta .primary-btn { flex: 1 1 200px; max-width: 240px; }
+
+    .switch-link {
       display: inline-flex;
-      margin-top: 18px;
-      padding: 4px;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-sm);
+      align-items: center;
+      gap: 4px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--color-text-subtle);
+      text-decoration: none;
+      transition: color var(--transition);
     }
-    .arch-option {
-      padding: 8px 18px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--color-text-muted);
-      background: transparent;
-      border: none;
-      border-radius: 7px;
-      cursor: pointer;
-      transition: color var(--transition), background var(--transition);
-      font-family: inherit;
-    }
-    .arch-option:hover { color: var(--color-text); }
-    .arch-option.active {
-      color: var(--color-text);
-      background: var(--color-bg);
-      box-shadow: var(--shadow-sm);
-    }
-    .arch-option:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+    .switch-link:hover { color: var(--color-primary); }
+    .switch-link u { text-decoration: underline; }
 
     .hint {
       margin: 14px auto 0;
@@ -206,6 +199,27 @@
     footer a:hover { color: var(--color-text-muted); text-decoration: underline; }
     .divider { display: inline-block; margin: 0 6px; opacity: 0.6; }
 
+    /* Debug panel — shown only when ?debug is in URL */
+    .debug-panel {
+      display: none;
+      margin: 24px auto 0;
+      padding: 14px 18px;
+      max-width: 520px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      text-align: left;
+      color: var(--color-text-muted);
+    }
+    .debug-panel.show { display: block; }
+    .debug-panel strong { color: var(--color-text); font-weight: 600; }
+    .debug-panel .row { display: flex; gap: 8px; }
+    .debug-panel .row .key { color: var(--color-text-subtle); flex-shrink: 0; min-width: 100px; }
+    .debug-panel .row .val { word-break: break-all; }
+
     /* iOS/Android nudge */
     .mobile-note {
       display: none;
@@ -242,6 +256,8 @@
     <div class="cta" id="cta"></div>
     <p class="hint" id="hint"></p>
 
+    <div class="debug-panel" id="debug"></div>
+
     <div class="other" id="other"></div>
 
     <footer>
@@ -274,39 +290,24 @@
       return 'unknown';
     }
 
-    async function macArchFromUACH() {
-      // Reliable on Chromium browsers (Chrome / Edge / Brave / Opera).
+    function btnHTML(asset, platformIcon, fullLabel) {
+      // Note on Mac arch detection (handled inline in init()):
+      //
+      // Reliable on Chromium browsers (Chrome / Edge / Brave / Opera) via
+      // navigator.userAgentData.getHighEntropyValues({architecture}).
       // Returns null on Safari and Firefox — they don't expose architecture
-      // for fingerprinting reasons. In that case we fall back to a manual
-      // toggle. Apple Silicon Macs intentionally report "MacIntel" in
-      // navigator.platform and freeze the OS version in the user-agent
-      // string at "Mac OS X 10_15_7", so version-based detection is
-      // unreliable by design.
-      try {
-        if (navigator.userAgentData?.getHighEntropyValues) {
-          const data = await navigator.userAgentData.getHighEntropyValues(['architecture']);
-          if (data.architecture === 'arm')  return 'arm';
-          if (data.architecture === 'x86')  return 'x64';
-        }
-      } catch (_) { /* fall through */ }
-      return null;
-    }
-
-    function btnHTML(asset, platformIcon) {
+      // for fingerprinting reasons. In that case we don't presume; we show
+      // both Mac options as equal-weight buttons and let the user pick.
+      //
+      // Apple Silicon Macs intentionally report "MacIntel" in navigator.platform
+      // and freeze the OS version in the user-agent string at "Mac OS X 10_15_7",
+      // so version-based detection is unreliable by design.
+      const label = fullLabel ?? `Download for ${asset.label.split(' (')[0]}`;
       return `
         <a href="${asset.url}" class="primary-btn" download>
           ${SVG[platformIcon] || SVG.download}
-          <span>Download for ${asset.label.split(' (')[0]}</span>
+          <span>${label}</span>
         </a>`;
-    }
-
-    function archToggleHTML(activeArch) {
-      const isArm = activeArch === 'arm';
-      return `
-        <div class="arch-toggle" role="tablist" aria-label="Mac chip type">
-          <button class="arch-option ${isArm ? 'active' : ''}" role="tab" aria-selected="${isArm}" data-arch="arm">Apple chip</button>
-          <button class="arch-option ${!isArm ? 'active' : ''}" role="tab" aria-selected="${!isArm}" data-arch="x64">Intel chip</button>
-        </div>`;
     }
 
     function renderMac(detectedArch) {
@@ -314,26 +315,28 @@
       const hint = document.getElementById('hint');
       const other = document.getElementById('other');
 
-      // Default the toggle to "arm" since it's the more common Mac in 2025+.
-      // If we DID detect, that's the active arch. The user can override.
-      let activeArch = detectedArch || 'arm';
-      const wasDetected = detectedArch !== null;
-
-      function paint() {
-        const asset = activeArch === 'arm' ? ASSETS.mac_arm : ASSETS.mac_x64;
-        cta.innerHTML = btnHTML(asset, 'apple') + archToggleHTML(activeArch);
-        cta.querySelectorAll('.arch-option').forEach(btn => {
-          btn.addEventListener('click', () => {
-            activeArch = btn.dataset.arch;
-            paint();
-          });
-        });
+      if (detectedArch) {
+        // Confident detection (Chrome/Edge/Brave). Single big CTA, with a
+        // visible "wrong chip?" escape hatch underneath.
+        const asset = detectedArch === 'arm' ? ASSETS.mac_arm : ASSETS.mac_x64;
+        const otherAsset = detectedArch === 'arm' ? ASSETS.mac_x64 : ASSETS.mac_arm;
+        const otherLabel = detectedArch === 'arm' ? 'Intel' : 'Apple';
+        cta.innerHTML = btnHTML(asset, 'apple');
+        hint.innerHTML = `
+          On a different Mac? Get the
+          <a href="${otherAsset.url}" class="switch-link" download>
+            <u>${otherLabel} chip</u> version
+          </a> instead.`;
+      } else {
+        // Safari / Firefox / unknown — don't presume. Show two equal buttons.
+        cta.innerHTML = `
+          <div class="dual-cta">
+            ${btnHTML(ASSETS.mac_arm, 'apple', 'macOS · Apple chip')}
+            ${btnHTML(ASSETS.mac_x64, 'apple', 'macOS · Intel chip')}
+          </div>`;
+        hint.innerHTML = `
+          Not sure which one? <kbd>Apple menu</kbd> → <kbd>About This Mac</kbd> → look for <em>Chip</em>.`;
       }
-      paint();
-
-      hint.innerHTML = wasDetected
-        ? ''
-        : `Not sure which chip your Mac has? <br><kbd>Apple menu</kbd> → <kbd>About This Mac</kbd> → look for <em>Chip</em>.`;
 
       other.innerHTML = `
         <h2>Other platforms</h2>
@@ -372,10 +375,38 @@
       renderUnknown();
     }
 
+    async function showDebug(platform, arch, uachData) {
+      if (!new URLSearchParams(location.search).has('debug')) return;
+      const escape = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+      const row = (k, v) => `<div class="row"><span class="key">${k}</span><span class="val">${escape(v)}</span></div>`;
+      const panel = document.getElementById('debug');
+      panel.innerHTML = `
+        <strong>Detection debug</strong>
+        ${row('Platform:', platform)}
+        ${row('Mac arch:', arch ?? '(undetected — falling back to user pick)')}
+        ${row('userAgentData:', navigator.userAgentData ? 'available' : 'not exposed (Safari/Firefox)')}
+        ${row('UA-CH architecture:', uachData?.architecture ?? '—')}
+        ${row('UA-CH bitness:', uachData?.bitness ?? '—')}
+        ${row('UA-CH platform:', uachData?.platform ?? '—')}
+        ${row('navigator.platform:', navigator.platform)}
+        ${row('navigator.userAgent:', navigator.userAgent)}
+      `;
+      panel.classList.add('show');
+    }
+
     async function init() {
       const platform = platformFromUA();
+      let arch = null;
+      let uachData = null;
       if (platform === 'mac') {
-        const arch = await macArchFromUACH();
+        // Capture the raw UA-CH payload for debug display.
+        try {
+          if (navigator.userAgentData?.getHighEntropyValues) {
+            uachData = await navigator.userAgentData.getHighEntropyValues(['architecture', 'bitness', 'platform']);
+            if (uachData.architecture === 'arm') arch = 'arm';
+            else if (uachData.architecture === 'x86') arch = 'x64';
+          }
+        } catch (_) { /* leave arch null */ }
         renderMac(arch);
       } else if (platform === 'win') {
         renderWin();
@@ -384,6 +415,7 @@
       } else {
         renderUnknown();
       }
+      showDebug(platform, arch, uachData);
 
       // Footer: latest version + date.
       try {
