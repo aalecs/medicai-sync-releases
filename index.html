@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Download Medicai Sync</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --color-primary: #00bfa5;
+      --color-primary-dark: #00897b;
+      --color-text: #1a1a1a;
+      --color-muted: #666;
+      --color-bg: #fafafa;
+      --color-border: #e0e0e0;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--color-text);
+      background: var(--color-bg);
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 80px 24px 40px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin: 0 0 8px;
+    }
+    .tagline {
+      color: var(--color-muted);
+      margin: 0 0 48px;
+    }
+    .primary-btn {
+      display: inline-block;
+      padding: 14px 32px;
+      background: var(--color-primary);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      transition: background 0.15s;
+    }
+    .primary-btn:hover {
+      background: var(--color-primary-dark);
+    }
+    .primary-btn:focus { outline: 3px solid rgba(0,191,165,0.3); }
+    .arch-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+    .arch-btn {
+      padding: 10px 20px;
+      background: white;
+      color: var(--color-primary-dark);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .arch-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+    .other-platforms {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--color-border);
+    }
+    .other-platforms h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 16px;
+    }
+    .other-platforms ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .other-platforms a {
+      color: var(--color-muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .other-platforms a:hover { color: var(--color-primary); text-decoration: underline; }
+    .meta {
+      margin-top: 32px;
+      font-size: 12px;
+      color: var(--color-muted);
+    }
+    .meta a { color: var(--color-muted); }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-text: #f0f0f0;
+        --color-muted: #999;
+        --color-bg: #0e0e0e;
+        --color-border: #2a2a2a;
+      }
+      .arch-btn { background: #1a1a1a; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Medicai Sync</h1>
+    <p class="tagline">Desktop companion for Medicai's cloud PACS.<br>Watches folders, validates DICOM files, and uploads them automatically.</p>
+
+    <div id="primary"></div>
+
+    <div class="other-platforms" id="other"></div>
+
+    <p class="meta">
+      <span id="version-info">Loading latest version…</span> ·
+      <a href="https://github.com/aalecs/medicai-sync-releases/releases">All releases</a>
+    </p>
+  </div>
+
+  <script>
+    const BASE = 'https://github.com/aalecs/medicai-sync-releases/releases/latest/download';
+    const ASSETS = {
+      macArm: { url: BASE + '/Medicai-Sync-arm64.dmg',  label: 'Apple Silicon (M1/M2/M3)' },
+      macX64: { url: BASE + '/Medicai-Sync-x64.dmg',    label: 'Intel' },
+      win:    { url: BASE + '/Medicai-Sync-Setup.exe',  label: 'Windows' }
+    };
+
+    function detectPlatform() {
+      const ua = navigator.userAgent;
+      const platform = navigator.platform || '';
+      if (/Win/i.test(platform) || /Windows/i.test(ua))   return 'win';
+      if (/Mac/i.test(platform) || /Macintosh/i.test(ua)) {
+        // Apple Silicon detection — limited, but a reasonable guess.
+        // Mac OS X major >= 11 (Big Sur+) released alongside M1 chips.
+        // navigator.platform on arm64 is "MacIntel" too, so we use the
+        // OS-version heuristic. False positives default to a download
+        // page where the user can pick the right one.
+        const armHints = /Mac OS X 1[1-9]|Mac OS X 2/.test(ua);
+        return armHints ? 'macArm' : 'macX64';
+      }
+      return null;
+    }
+
+    function render() {
+      const detected = detectPlatform();
+      const primary = document.getElementById('primary');
+      const other = document.getElementById('other');
+
+      if (detected === 'macArm' || detected === 'macX64') {
+        const isArm = detected === 'macArm';
+        const main = isArm ? ASSETS.macArm : ASSETS.macX64;
+        const otherMac = isArm ? ASSETS.macX64 : ASSETS.macArm;
+        primary.innerHTML = `
+          <a href="${main.url}" class="primary-btn">Download for macOS</a>
+          <div class="arch-row">
+            <a href="${main.url}" class="arch-btn">${main.label}</a>
+            <a href="${otherMac.url}" class="arch-btn">${otherMac.label}</a>
+          </div>`;
+        other.innerHTML = `
+          <h2>Other platforms</h2>
+          <ul>
+            <li><a href="${ASSETS.win.url}">Windows</a></li>
+          </ul>`;
+      } else if (detected === 'win') {
+        primary.innerHTML = `<a href="${ASSETS.win.url}" class="primary-btn">Download for Windows</a>`;
+        other.innerHTML = `
+          <h2>Other platforms</h2>
+          <ul>
+            <li><a href="${ASSETS.macArm.url}">macOS (Apple Silicon)</a></li>
+            <li><a href="${ASSETS.macX64.url}">macOS (Intel)</a></li>
+          </ul>`;
+      } else {
+        primary.innerHTML = `<p style="color:var(--color-muted)">Pick your platform:</p>`;
+        other.innerHTML = `
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;">
+            <li><a href="${ASSETS.macArm.url}" class="arch-btn">macOS (Apple Silicon)</a></li>
+            <li><a href="${ASSETS.macX64.url}" class="arch-btn">macOS (Intel)</a></li>
+            <li><a href="${ASSETS.win.url}" class="arch-btn">Windows</a></li>
+          </ul>`;
+      }
+
+      // Fetch latest version + release date for footer.
+      fetch('https://api.github.com/repos/aalecs/medicai-sync-releases/releases/latest')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return;
+          const tag = data.tag_name || '';
+          const date = data.published_at ? new Date(data.published_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+          document.getElementById('version-info').textContent = `${tag} · ${date}`;
+        })
+        .catch(() => {
+          document.getElementById('version-info').textContent = '';
+        });
+    }
+
+    render();
+  </script>
+</body>
+</html>
